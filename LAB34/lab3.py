@@ -13,6 +13,7 @@ TFact = TypeVar("TFact", bound=Fact)
 
 @dataclass(frozen=True)
 class UserRequirement(Fact):
+    # Требования пользователя к будущей сборке ПК.
     purpose: str
     budget: int
     resolution: str
@@ -20,6 +21,7 @@ class UserRequirement(Fact):
 
 @dataclass(frozen=True)
 class CPU(Fact):
+    # Данные о процессоре.
     model: str
     socket: str
     tdp: int
@@ -27,6 +29,7 @@ class CPU(Fact):
 
 @dataclass(frozen=True)
 class Motherboard(Fact):
+    # Данные о материнской плате.
     model: str
     socket: str
     ram_type: str
@@ -34,36 +37,43 @@ class Motherboard(Fact):
 
 @dataclass(frozen=True)
 class GPU(Fact):
+    # Данные о видеокарте.
     model: str
     tdp: int
 
 
 @dataclass(frozen=True)
 class PSU(Fact):
+    # Данные о блоке питания.
     power: int
 
 
 @dataclass(frozen=True)
 class Compatibility(Fact):
+    # Результат проверки совместимости CPU и материнской платы.
     status: str
 
 
 @dataclass(frozen=True)
 class PowerStatus(Fact):
+    # Результат проверки достаточности мощности БП.
     status: str
 
 
 @dataclass(frozen=True)
 class BuildResult(Fact):
+    # Итоговый вывод по всей сборке.
     status: str
 
 
 @dataclass(frozen=True)
 class SelectedComponent(Fact):
+    # Текстовое описание выбранных или проверенных компонентов.
     description: str
 
 
 def Rule(name: str) -> Callable[[Callable[..., None]], Callable[..., None]]:
+    # Декоратор помечает метод как правило экспертной системы.
     def decorator(func: Callable[..., None]) -> Callable[..., None]:
         func._is_rule = True
         func._rule_name = name
@@ -74,18 +84,21 @@ def Rule(name: str) -> Callable[[Callable[..., None]], Callable[..., None]]:
 
 class Engine:
     def __init__(self) -> None:
+        # Хранит факты по типам, список правил и имена уже сработавших правил.
         self.facts: Dict[Type[Fact], Set[Fact]] = {}
         self.rules: List[Callable[[], None]] = []
         self.fired_rules: List[str] = []
         self._collect_rules()
 
     def _collect_rules(self) -> None:
+        # Собирает все методы, помеченные как правила.
         for attr_name in dir(self):
             method = getattr(self, attr_name)
             if callable(method) and getattr(method, "_is_rule", False):
                 self.rules.append(method)
 
     def assert_fact(self, fact: Fact) -> bool:
+        # Добавляет факт, если такого факта ещё нет.
         fact_type = type(fact)
         self.facts.setdefault(fact_type, set())
         if fact in self.facts[fact_type]:
@@ -94,16 +107,20 @@ class Engine:
         return True
 
     def get_facts(self, fact_type: Type[TFact]) -> List[TFact]:
-        return cast(List[TFact], list(self.facts.get(fact_type, set())))
+        # Возвращает все факты указанного типа.
+        return list(self.facts.get(fact_type, set()))
 
     def clear_facts(self, fact_type: Type[Fact]) -> None:
+        # Удаляет все факты заданного типа.
         if fact_type in self.facts:
             self.facts[fact_type].clear()
 
     def total_facts(self) -> int:
+        # Считает общее количество фактов в системе.
         return sum(len(items) for items in self.facts.values())
 
     def run(self) -> None:
+        # Запускает правила, пока они продолжают добавлять новые факты.
         changed = True
         while changed:
             changed = False
@@ -119,20 +136,24 @@ class Engine:
 
 
 class PCExpertSystem(Engine):
+    # Предопределённые компоненты для игровой сборки.
     GAMING_CPU = CPU("Ryzen 5 5600", "AM4", 65)
     GAMING_GPU = GPU("RTX 3060", 170)
 
     def _replace_single_status(self, fact: Fact) -> None:
+        # Оставляет только один актуальный статус факта нужного типа.
         self.clear_facts(type(fact))
         self.assert_fact(fact)
 
     def _replace_psu_message(self, message: str) -> None:
+        # Обновляет сообщение о блоке питания, удаляя старые сообщения.
         selected = cast(Set[SelectedComponent], self.facts.get(SelectedComponent, set()))
         self.facts[SelectedComponent] = {fact for fact in selected if "БП" not in fact.description}
         self.assert_fact(SelectedComponent(message))
 
     @Rule("R1_CPU_for_Gaming")
     def select_cpu(self) -> None:
+        # Выбирает игровой CPU, если сборка нужна для игр и бюджет позволяет.
         for req in self.get_facts(UserRequirement):
             if req.purpose.lower() == "игры" and req.budget > 60000:
                 self.assert_fact(self.GAMING_CPU)
@@ -140,6 +161,7 @@ class PCExpertSystem(Engine):
 
     @Rule("R5_GPU_for_Gaming")
     def select_gpu(self) -> None:
+        # Выбирает игровую GPU для 1080p-сборки.
         for req in self.get_facts(UserRequirement):
             if req.purpose.lower() == "игры" and req.resolution == "1080p":
                 self.assert_fact(self.GAMING_GPU)
@@ -147,6 +169,7 @@ class PCExpertSystem(Engine):
 
     @Rule("R3_CPU_MB_Compatibility")
     def check_socket(self) -> None:
+        # Проверяет совместимость сокета CPU и материнской платы.
         if any(item.status == "несовместимы" for item in self.get_facts(Compatibility)):
             return
 
@@ -158,6 +181,7 @@ class PCExpertSystem(Engine):
 
     @Rule("R4_CPU_MB_Not_Compatible")
     def check_socket_fail(self) -> None:
+        # Фиксирует несовместимость, если сокеты CPU и платы не совпадают.
         for cpu in self.get_facts(CPU):
             for motherboard in self.get_facts(Motherboard):
                 if cpu.socket != motherboard.socket:
@@ -166,6 +190,7 @@ class PCExpertSystem(Engine):
 
     @Rule("R6_PSU_Sufficient")
     def check_power(self) -> None:
+        # Считает суммарное потребление и проверяет, хватает ли мощности БП.
         total_tdp = sum(cpu.tdp for cpu in self.get_facts(CPU))
         total_tdp += sum(gpu.tdp for gpu in self.get_facts(GPU))
         required_power = int(total_tdp * 1.2)
@@ -181,6 +206,7 @@ class PCExpertSystem(Engine):
 
     @Rule("R_Final_Build")
     def final_build(self) -> None:
+        # Формирует итоговый вывод по совместимости и питанию.
         compatibility = self.get_facts(Compatibility)
         power = self.get_facts(PowerStatus)
         if compatibility and power:
@@ -191,6 +217,7 @@ class PCExpertSystem(Engine):
 
 
 def read_int(prompt: str, error_message: str) -> int:
+    # Безопасно читает целое число из ввода.
     while True:
         try:
             return int(input(prompt).strip())
@@ -199,6 +226,7 @@ def read_int(prompt: str, error_message: str) -> int:
 
 
 def interactive_input() -> tuple[str, int, str, str, int]:
+    # Запрашивает у пользователя данные для ручного запуска сценария.
     print("\n=== Ввод исходных данных для сборки ПК ===")
     purpose = input("Цель сборки (игры/офис/другое): ").strip()
     budget = read_int("Бюджет (руб): ", "Ошибка: бюджет должен быть целым числом.")
@@ -209,18 +237,21 @@ def interactive_input() -> tuple[str, int, str, str, int]:
 
 
 def print_selected_components(engine: PCExpertSystem) -> None:
+    # Выводит все промежуточные сообщения о выбранных компонентах.
     print("\nПромежуточные факты:")
     for fact in sorted(engine.get_facts(SelectedComponent), key=lambda item: item.description):
         print(f"- {fact.description}")
 
 
 def print_build_result(engine: PCExpertSystem) -> None:
+    # Показывает итоговый результат проверки сборки.
     print("\nРезультат сборки:")
     for result in engine.get_facts(BuildResult):
         print(f"- {result.status}")
 
 
 def print_fired_rules(engine: PCExpertSystem) -> None:
+    # Выводит список правил, которые сработали во время расчёта.
     print("\nСработавшие правила:")
     for rule in engine.fired_rules:
         print(f"- {rule}")
