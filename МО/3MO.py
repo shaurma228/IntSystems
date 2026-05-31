@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from typing import Optional
 from sklearn import datasets
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -50,12 +51,27 @@ def describe_worst_class(
     report_dict: dict,
     cm: np.ndarray,
     target_names: np.ndarray,
-) -> int:
+) -> Optional[int]:
     recalls = {
         class_id: report_dict[target_names[class_id]]["recall"]
         for class_id in range(len(target_names))
     }
-    worst_class = min(recalls, key=recalls.get)
+    min_recall = min(recalls.values())
+    worst_classes = [
+        class_id for class_id, recall in recalls.items() if np.isclose(recall, min_recall)
+    ]
+
+    print(f"\nАнализ худшего класса для {model_name}:")
+
+    if np.isclose(min_recall, 1.0) and len(worst_classes) == len(target_names):
+        print(
+            "Худшего класса нет: у всех классов recall=1.0000, "
+            "то есть модель не пропустила ни одного объекта в тестовой выборке."
+        )
+        print("Матрица ошибок диагональная: все объекты каждого класса предсказаны верно.")
+        return None
+
+    worst_class = worst_classes[0]
     total_objects = int(cm[worst_class].sum())
     correct_objects = int(cm[worst_class, worst_class])
     false_negative_objects = total_objects - correct_objects
@@ -68,7 +84,6 @@ def describe_worst_class(
         if mistakes > 0:
             wrong_predictions.append(f"{target_names[predicted_class]}: {mistakes}")
 
-    print(f"\nАнализ худшего класса для {model_name}:")
     print(
         f"Хуже всего предсказывается {target_names[worst_class]}: "
         f"recall={recalls[worst_class]:.4f}."
@@ -158,7 +173,7 @@ def main() -> None:
     wine = datasets.load_wine()
     X = wine.data
     y = wine.target
-    target_names = wine.target_names
+    target_names = [str(name) for name in wine.target_names]
     feature_names = wine.feature_names
 
     print(f"Количество объектов: {X.shape[0]}")
@@ -225,10 +240,16 @@ def main() -> None:
             "model": model_name,
             "accuracy": result["accuracy"],
             "macro_f1": result["macro_f1"],
-            "worst_class": target_names[result["worst_class"]],
-            "worst_class_recall": result["report"][target_names[result["worst_class"]]][
-                "recall"
-            ],
+            "worst_class": (
+                "нет"
+                if result["worst_class"] is None
+                else target_names[result["worst_class"]]
+            ),
+            "worst_class_recall": (
+                1.0
+                if result["worst_class"] is None
+                else result["report"][target_names[result["worst_class"]]]["recall"]
+            ),
         }
         for model_name, result in results.items()
     ]
@@ -248,29 +269,49 @@ def main() -> None:
     base_rf = results["RandomForest"]
     balanced_rf = results["RandomForest balanced"]
     base_rf_worst_class = base_rf["worst_class"]
-    base_rf_worst_class_name = target_names[base_rf_worst_class]
-
-    base_recall = base_rf["report"][base_rf_worst_class_name]["recall"]
-    balanced_recall = balanced_rf["report"][base_rf_worst_class_name]["recall"]
 
     print("\nВлияние class_weight='balanced' на RandomForest:")
-    print(
-        f"Recall класса {base_rf_worst_class_name}, который был худшим у обычного RandomForest: "
-        f"{base_recall:.4f} -> {balanced_recall:.4f}"
-    )
+    if base_rf_worst_class is None:
+        rare_class_name = target_names[rarest_class]
+        base_recall = base_rf["report"][rare_class_name]["recall"]
+        balanced_recall = balanced_rf["report"][rare_class_name]["recall"]
+        print(
+            "У обычного RandomForest нет худшего класса: recall всех классов равен 1.0000."
+        )
+        print(
+            f"Для редкого класса {rare_class_name} recall изменился так: "
+            f"{base_recall:.4f} -> {balanced_recall:.4f}"
+        )
+    else:
+        base_rf_worst_class_name = target_names[base_rf_worst_class]
+        base_recall = base_rf["report"][base_rf_worst_class_name]["recall"]
+        balanced_recall = balanced_rf["report"][base_rf_worst_class_name]["recall"]
+        print(
+            f"Recall класса {base_rf_worst_class_name}, который был худшим у обычного RandomForest: "
+            f"{base_recall:.4f} -> {balanced_recall:.4f}"
+        )
     print(f"Macro-F1: {base_rf['macro_f1']:.4f} -> {balanced_rf['macro_f1']:.4f}")
 
-    best_between_required = max(
-        ["RandomForest", "LogisticRegression"],
-        key=lambda name: results[name]["macro_f1"],
-    )
-    best_overall = comparison[0]["model"]
+    base_model_names = ["RandomForest", "LogisticRegression"]
+    best_base_macro_f1 = max(results[name]["macro_f1"] for name in base_model_names)
+    best_base_models = [
+        name
+        for name in base_model_names
+        if np.isclose(results[name]["macro_f1"], best_base_macro_f1)
+    ]
 
     print("\nВывод:")
-    print(
-        f"По macro-F1 среди двух базовых моделей лучше справилась "
-        f"{best_between_required}: {results[best_between_required]['macro_f1']:.4f}."
-    )
+    if len(best_base_models) == 1:
+        print(
+            f"По macro-F1 среди двух базовых моделей лучше справилась "
+            f"{best_base_models[0]}: {best_base_macro_f1:.4f}."
+        )
+    else:
+        print(
+            "По macro-F1 две базовые модели справились одинаково: "
+            f"RandomForest={results['RandomForest']['macro_f1']:.4f}, "
+            f"LogisticRegression={results['LogisticRegression']['macro_f1']:.4f}."
+        )
 
     rare_class_name = target_names[rarest_class]
     rare_class_recalls = {
@@ -279,7 +320,11 @@ def main() -> None:
     }
     best_for_rare_class = max(
         rare_class_recalls,
-        key=lambda name: (rare_class_recalls[name], results[name]["macro_f1"]),
+        key=lambda name: (
+            rare_class_recalls[name],
+            results[name]["macro_f1"],
+            1 if name == "RandomForest balanced" else 0,
+        ),
     )
 
     print(
@@ -288,10 +333,21 @@ def main() -> None:
         f"recall редкого класса={rare_class_recalls[best_for_rare_class]:.4f}, "
         f"macro-F1={results[best_for_rare_class]['macro_f1']:.4f}."
     )
-    print(
-        f"Итоговая рекомендация с учетом всех метрик: {best_overall}, "
-        "так как эта модель имеет лучший баланс качества по классам в данном запуске."
-    )
+    top_macro_f1 = comparison[0]["macro_f1"]
+    top_models = [
+        row["model"] for row in comparison if np.isclose(row["macro_f1"], top_macro_f1)
+    ]
+    if len(top_models) == 1:
+        print(
+            f"Итоговая рекомендация с учетом всех метрик: {top_models[0]}, "
+            "так как эта модель имеет лучший баланс качества по классам в данном запуске."
+        )
+    else:
+        print(
+            f"Итоговая рекомендация для прототипа: {best_for_rare_class}. "
+            "В этом запуске лучшие модели дают одинаковые метрики, но class_weight='balanced' "
+            "лучше соответствует условию про редкий класс и не ухудшает качество."
+        )
 
 
 if __name__ == "__main__":
