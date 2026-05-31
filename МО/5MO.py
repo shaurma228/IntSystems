@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-from __future__ import annotations
-
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.datasets import fetch_california_housing
@@ -8,7 +5,6 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeRegressor
-
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.25
@@ -52,9 +48,9 @@ def plot_target_histogram(y: np.ndarray) -> None:
 
 
 def plot_feature_relationships(
-    X_selected: np.ndarray,
-    y: np.ndarray,
-    selected_features: list[str],
+        X_selected: np.ndarray,
+        y: np.ndarray,
+        selected_features: list[str],
 ) -> None:
     fig, axes = plt.subplots(1, len(selected_features), figsize=(15, 4.5))
 
@@ -71,12 +67,12 @@ def plot_feature_relationships(
 
 
 def evaluate_regression_model(
-    model_name: str,
-    model,
-    X_train: np.ndarray,
-    X_test: np.ndarray,
-    y_train: np.ndarray,
-    y_test: np.ndarray,
+        model_name: str,
+        model,
+        X_train: np.ndarray,
+        X_test: np.ndarray,
+        y_train: np.ndarray,
+        y_test: np.ndarray,
 ) -> dict:
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)

@@ -1,13 +1,9 @@
-# -*- coding: utf-8 -*-
-from __future__ import annotations
-
 import numpy as np
 from sklearn.datasets import fetch_california_housing
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.3
@@ -36,9 +32,9 @@ def load_previous_practice_data() -> tuple[np.ndarray, np.ndarray, list[str]]:
 
 
 def make_demo_train_subset(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    train_size: int = DEMO_TRAIN_SIZE,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        train_size: int = DEMO_TRAIN_SIZE,
 ) -> tuple[np.ndarray, np.ndarray]:
     rng = np.random.default_rng(RANDOM_STATE)
     selected_indices = rng.choice(
@@ -50,8 +46,8 @@ def make_demo_train_subset(
 
 
 def scale_train_test(
-    X_train: np.ndarray,
-    X_test: np.ndarray,
+        X_train: np.ndarray,
+        X_test: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, StandardScaler]:
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
@@ -60,9 +56,9 @@ def scale_train_test(
 
 
 def add_noise_features(
-    X_train: np.ndarray,
-    X_test: np.ndarray,
-    n_noise_features: int = N_NOISE_FEATURES,
+        X_train: np.ndarray,
+        X_test: np.ndarray,
+        n_noise_features: int = N_NOISE_FEATURES,
 ) -> tuple[np.ndarray, np.ndarray]:
     rng = np.random.default_rng(RANDOM_STATE)
     train_noise = rng.normal(size=(X_train.shape[0], n_noise_features))
@@ -74,10 +70,10 @@ def add_noise_features(
 
 
 def train_linear_and_get_r2(
-    X_train: np.ndarray,
-    X_test: np.ndarray,
-    y_train: np.ndarray,
-    y_test: np.ndarray,
+        X_train: np.ndarray,
+        X_test: np.ndarray,
+        y_train: np.ndarray,
+        y_test: np.ndarray,
 ) -> tuple[LinearRegression, float, float]:
     model = LinearRegression()
     model.fit(X_train, y_train)
@@ -88,11 +84,11 @@ def train_linear_and_get_r2(
 
 
 def train_ridge_and_get_test_r2(
-    alpha: float,
-    X_train: np.ndarray,
-    X_test: np.ndarray,
-    y_train: np.ndarray,
-    y_test: np.ndarray,
+        alpha: float,
+        X_train: np.ndarray,
+        X_test: np.ndarray,
+        y_train: np.ndarray,
+        y_test: np.ndarray,
 ) -> tuple[Ridge, float, float]:
     model = Ridge(alpha=alpha)
     model.fit(X_train, y_train)
@@ -103,12 +99,12 @@ def train_ridge_and_get_test_r2(
 
 
 def print_results_table(
-    baseline_test_r2: float,
-    broken_train_r2: float,
-    broken_test_r2: float,
-    best_alpha: float,
-    best_ridge_train_r2: float,
-    best_ridge_test_r2: float,
+        baseline_test_r2: float,
+        broken_train_r2: float,
+        broken_test_r2: float,
+        best_alpha: float,
+        best_ridge_train_r2: float,
+        best_ridge_test_r2: float,
 ) -> None:
     print_section("Итоговая таблица")
 
