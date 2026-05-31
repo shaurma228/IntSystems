@@ -306,15 +306,6 @@ def main() -> None:
             f"{best_base_macro_f1:.4f}."
         )
 
-    print(
-        "Для итогового прототипа выбираю RandomForest balanced: "
-        "он учитывает вес редкого класса и оставляет понятную точку роста для практики 4."
-    )
-    print(
-        f"Зафиксированные настройки для следующей практики: {BASE_RF_PARAMS}, "
-        "class_weight='balanced'."
-    )
-
 
 if __name__ == "__main__":
     main()
