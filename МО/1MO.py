@@ -53,7 +53,6 @@ preprocessor = ColumnTransformer(
     transformers=[
         ('num', StandardScaler(), numerical_features),
         ('cat', OneHotEncoder(drop='first', handle_unknown='ignore'), categorical_features)
-        # drop='first' для избежания мультиколлинеарности
     ])
 
 # Применяем предобработку к тренировочным и тестовым данным

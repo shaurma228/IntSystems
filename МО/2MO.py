@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-# Для борьбы с дисбалансом
 from imblearn.over_sampling import SMOTE
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
@@ -62,6 +61,8 @@ print("=" * 50)
 # Предсказания лучшей модели
 y_pred_best = best_model.predict(X_test_processed)
 
+#-----------------------------------------------------------------------------------------------------------------------
+
 # Classification report
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred_best, target_names=['Остался (0)', 'Ушёл (1)']))
@@ -84,39 +85,21 @@ print("\n" + "=" * 50)
 print("СОЗДАНИЕ КОНВЕЙЕРА С БОРЬБОЙ С ДИСБАЛАНСОМ")
 print("=" * 50)
 
-# Если модель поддерживает class_weight, используем его. Иначе применим SMOTE.
-if hasattr(best_model, 'class_weight'):
-    # Для LogisticRegression и DecisionTree можно сразу указать class_weight='balanced'
-    # Но мы создадим Pipeline с предобработкой и моделью, где укажем class_weight позже
-    pass
-
-# Создадим предобработчик (такой же, как раньше)
+# Создадим предобработчик
 preprocessor = ColumnTransformer([
     ('num', StandardScaler(), numerical_features),
     ('cat', OneHotEncoder(drop='first', handle_unknown='ignore'), categorical_features)
 ])
 
-# Выберем тип модели и будем настраивать её. Для примера возьмём LogisticRegression,
-# но если лучшая модель была другой, можно оставить её.
-# В данном коде мы будем работать с LogisticRegression, так как она часто лучшая.
-# Если лучшая модель другая, замените в следующих ячейках.
-
-# Убедимся, что мы используем ту же архитектуру модели, что и лучшая.
-# Для простоты предположим, что лучшая модель - LogisticRegression.
-# Если это не так, можно скопировать класс лучшей модели.
 model_class = type(best_model)  # Получаем класс лучшей модели
 
-# Для борьбы с дисбалансом добавим class_weight='balanced' (если модель поддерживает)
 if hasattr(model_class(), 'class_weight'):
-    # Используем стандартный Pipeline с class_weight в модели
     pipeline = Pipeline(steps=[
         ('preprocessor', preprocessor),
         ('classifier', model_class(class_weight='balanced', random_state=42))
     ])
     use_smote = False
 else:
-    # Для KNeighbors (не поддерживает class_weight) используем SMOTE
-    # Для SMOTE нужен imblearn Pipeline, который вставляет SMOTE после предобработки
     from imblearn.pipeline import Pipeline as ImbPipeline
 
     pipeline = ImbPipeline(steps=[
@@ -139,10 +122,9 @@ param_grid = {}
 if model_class == LogisticRegression:
     param_grid = {
         'classifier__C': [0.01, 0.1, 1, 10, 100],
-        'classifier__penalty': ['l2'],  # l1 требует solver='liblinear'
-        'classifier__solver': ['lbfgs', 'liblinear']  # liblinear поддерживает l1, но для l2 тоже
+        'classifier__penalty': ['l2'],
+        'classifier__solver': ['lbfgs', 'liblinear']
     }
-    # Если используем class_weight='balanced', оно уже в pipeline, но можно также попробовать разные варианты
 elif model_class == DecisionTreeClassifier:
     param_grid = {
         'classifier__max_depth': [5, 10, 15, 20, None],
@@ -156,15 +138,12 @@ elif model_class == KNeighborsClassifier:
         'classifier__p': [1, 2]  # 1 - манхэттенское, 2 - евклидово
     }
 
-# Если мы используем SMOTE, то параметры будут с префиксом 'smote__'? Но SMOTE обычно не настраиваем.
-# Для простоты оставим только параметры классификатора.
-
-# Выполним GridSearchCV с 5-кратной кросс-валидацией, метрика - f1 (так как хотим улучшить recall)
+# Выполним GridSearchCV с 5-кратной кросс-валидацией, метрика - f1
 grid_search = GridSearchCV(
     pipeline,
     param_grid,
     cv=5,
-    scoring='f1',  # можно также 'roc_auc' или 'recall', но f1 балансирует
+    scoring='f1',
     n_jobs=-1,
     verbose=1
 )
@@ -189,7 +168,6 @@ y_pred_final = best_final_model.predict(X_test)
 if hasattr(best_final_model, 'predict_proba'):
     y_proba = best_final_model.predict_proba(X_test)[:, 1]
 else:
-    # Для некоторых моделей (например, KNN) может не быть predict_proba? У KNeighbors есть.
     y_proba = best_final_model.predict_proba(X_test)[:, 1]
 
 # Метрики
