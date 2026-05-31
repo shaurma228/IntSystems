@@ -13,7 +13,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-
 RANDOM_STATE = 42
 TEST_SIZE = 0.25
 
@@ -46,10 +45,10 @@ def analyze_class_distribution(y: np.ndarray, target_names: np.ndarray) -> int:
 
 
 def describe_worst_class(
-    model_name: str,
-    report_dict: dict,
-    cm: np.ndarray,
-    target_names: np.ndarray,
+        model_name: str,
+        report_dict: dict,
+        cm: np.ndarray,
+        target_names: np.ndarray,
 ) -> int:
     recalls = {
         class_id: report_dict[target_names[class_id]]["recall"]
@@ -95,13 +94,13 @@ def describe_worst_class(
 
 
 def evaluate_model(
-    model_name: str,
-    model,
-    X_train: np.ndarray,
-    X_test: np.ndarray,
-    y_train: np.ndarray,
-    y_test: np.ndarray,
-    target_names: np.ndarray,
+        model_name: str,
+        model,
+        X_train: np.ndarray,
+        X_test: np.ndarray,
+        y_train: np.ndarray,
+        y_test: np.ndarray,
+        target_names: np.ndarray,
 ) -> dict:
     print_section(f"Модель: {model_name}")
 
@@ -272,22 +271,6 @@ def main() -> None:
         f"{best_between_required}: {results[best_between_required]['macro_f1']:.4f}."
     )
 
-    rare_class_name = target_names[rarest_class]
-    rare_class_recalls = {
-        model_name: result["report"][rare_class_name]["recall"]
-        for model_name, result in results.items()
-    }
-    best_for_rare_class = max(
-        rare_class_recalls,
-        key=lambda name: (rare_class_recalls[name], results[name]["macro_f1"]),
-    )
-
-    print(
-        f"Если важно не пропустить представителей редкого класса "
-        f"{rare_class_name}, выбираю {best_for_rare_class}: "
-        f"recall редкого класса={rare_class_recalls[best_for_rare_class]:.4f}, "
-        f"macro-F1={results[best_for_rare_class]['macro_f1']:.4f}."
-    )
     print(
         f"Итоговая рекомендация с учетом всех метрик: {best_overall}, "
         "так как эта модель имеет лучший баланс качества по классам в данном запуске."
