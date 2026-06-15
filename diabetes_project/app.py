@@ -1,11 +1,20 @@
 import pickle
+from pathlib import Path
 
 import gradio as gr
 import numpy as np
 import pandas as pd
 
-# Загрузка модели и метаданных
-with open("models/model.pkl", "rb") as f:
+ROOT = Path(__file__).parent
+MODEL_PATH = ROOT / "models" / "model.pkl"
+
+if not MODEL_PATH.exists():
+    raise FileNotFoundError(
+        f"Файл модели не найден: {MODEL_PATH}\n"
+        "Сначала запустите обучение: python train.py"
+    )
+
+with open(MODEL_PATH, "rb") as f:
     model_data = pickle.load(f)
 
 model = model_data["model"]
@@ -13,8 +22,19 @@ feature_names = model_data["feature_names"]
 model_name = model_data["model_name"]
 errors_sample = model_data.get("errors_sample")
 
+FEATURE_LABELS = {
+    "Pregnancies": "Беременности",
+    "Glucose": "Глюкоза",
+    "BloodPressure": "Давление",
+    "SkinThickness": "Толщина кожи",
+    "Insulin": "Инсулин",
+    "BMI": "ИМТ",
+    "DiabetesPedigreeFunction": "Наследственность",
+    "Age": "Возраст",
+}
 
-def get_feature_importance(pipeline, features):
+
+def get_feature_importance(pipeline, features: list[str]) -> pd.DataFrame | None:
     """Извлечение важности признаков из модели."""
     inner_model = pipeline.named_steps["model"]
 
@@ -25,51 +45,31 @@ def get_feature_importance(pipeline, features):
     else:
         return None
 
-    df_importance = pd.DataFrame({
-        "Признак": features,
-        "Важность": importances
-    }).sort_values(by="Важность", ascending=False)
+    return (
+        pd.DataFrame({"Признак": features, "Важность": importances})
+        .assign(Признак=lambda df: df["Признак"].map(lambda x: FEATURE_LABELS.get(x, x)))
+        .sort_values("Важность", ascending=False)
+    )
 
-    return df_importance
 
-
-def predict(*args):
-    # Создаем DataFrame из входа
+def predict(*args) -> tuple[str, pd.DataFrame | None]:
     X = pd.DataFrame([args], columns=feature_names)
 
-    # Предсказание
     pred = model.predict(X)[0]
     proba = model.predict_proba(X)[0][1]
 
-    if pred == 1:
-        result_text = "## Риск диабета ПОВЫШЕН"
-    else:
-        result_text = "## Риск диабета НИЗКИЙ"
+    label = "ПОВЫШЕН" if pred == 1 else "НИЗКИЙ"
+    result_text = (
+        f"## Риск диабета {label}\n"
+        f"**Вероятность:** {proba * 100:.1f}%\n"
+        f"*(Использована модель: {model_name})*"
+    )
 
-    result_text += f"\n**Вероятность:** {proba * 100:.1f}%"
-    result_text += f"\n*(Использована модель: {model_name})*"
-
-    # График важности
     importance_df = get_feature_importance(model, feature_names)
-    
-    # Перевод названий признаков на русский для графика
-    translation_map = {
-        'Pregnancies': 'Беременности',
-        'Glucose': 'Глюкоза',
-        'BloodPressure': 'Давление',
-        'SkinThickness': 'Толщина кожи',
-        'Insulin': 'Инсулин',
-        'BMI': 'ИМТ',
-        'DiabetesPedigreeFunction': 'Наследственность',
-        'Age': 'Возраст'
-    }
-    importance_df['Признак'] = importance_df['Признак'].map(lambda x: translation_map.get(x, x))
-
     return result_text, importance_df
 
 
-# Создание интерфейса
-with gr.Blocks() as demo:
+with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown(
         f"""
         # Система диагностики диабета
@@ -102,13 +102,13 @@ with gr.Blocks() as demo:
                     importance_plot = gr.BarPlot(
                         x="Важность",
                         y="Признак",
-                        title="Относительное влияние показателей"
+                        title="Относительное влияние показателей",
                     )
 
             predict_btn.click(
                 fn=predict,
                 inputs=[pregnancies, glucose, blood_pressure, skin_thickness, insulin, bmi, dpf, age],
-                outputs=[output_text, importance_plot]
+                outputs=[output_text, importance_plot],
             )
 
             gr.Examples(
@@ -127,4 +127,4 @@ with gr.Blocks() as demo:
                 gr.Markdown("Ошибок на тестовой выборке не обнаружено или данные отсутствуют.")
 
 if __name__ == "__main__":
-    demo.launch(theme=gr.themes.Soft())
+    demo.launch()
