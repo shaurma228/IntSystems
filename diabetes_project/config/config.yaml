@@ -1,0 +1,23 @@
+dataset:
+  url: "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv"
+  test_size: 0.2
+  random_state: 42
+  zero_columns: [ "Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI" ]
+
+model:
+  path: "models/model.pkl"
+  cv: 5
+  scoring: "f1"
+
+hyperparameters:
+  logistic_regression:
+    model__C: [ 0.1, 1, 10 ]
+    model__class_weight: [ "balanced" ]
+  random_forest:
+    model__n_estimators: [ 100, 200 ]
+    model__max_depth: [ null, 5, 10 ]
+    model__class_weight: [ "balanced" ]
+  gradient_boosting:
+    model__n_estimators: [ 100, 200 ]
+    model__learning_rate: [ 0.01, 0.1 ]
+    model__max_depth: [ 3, 5 ]
