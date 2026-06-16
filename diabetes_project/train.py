@@ -2,8 +2,15 @@ import logging
 import pickle
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import yaml
-from sklearn.metrics import classification_report, f1_score
+from sklearn.metrics import (
+    ConfusionMatrixDisplay,
+    classification_report,
+    confusion_matrix,
+    recall_score,
+    roc_auc_score,
+)
 
 from src.data import load_data, prepare_data, validate_columns
 from src.model import create_pipelines, tune_models
@@ -53,13 +60,31 @@ def main() -> None:
     logger.info("Победитель: %s", best_name)
 
     y_pred = best_pipeline.predict(X_test)
+    y_proba = best_pipeline.predict_proba(X_test)[:, 1]
+
+    recall = recall_score(y_test, y_pred)
+    roc_auc = roc_auc_score(y_test, y_proba)
+
     logger.info("\n=== ОТЧЁТ НА ТЕСТОВОЙ ВЫБОРКЕ ===\n%s", classification_report(y_test, y_pred))
+    logger.info("ROC-AUC: %.4f", roc_auc)
+
+    # Матрица ошибок — позволяет видеть FP и FN, а не просто итоговый счёт
+    cm = confusion_matrix(y_test, y_pred)
+    fn = int(cm[1, 0])  # actual=Диабет, predicted=Нет — ложноотрицательные
+    cm_path = ROOT / model_cfg.get("confusion_matrix_path", "models/confusion_matrix.png")
+    cm_path.parent.mkdir(parents=True, exist_ok=True)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Нет диабета", "Диабет"])
+    disp.plot()
+    plt.title("Матрица ошибок")
+    plt.tight_layout()
+    plt.savefig(cm_path)
+    plt.close()
+    logger.info("Матрица ошибок сохранена в %s", cm_path)
 
     test_results = X_test.copy()
     test_results["Actual"] = y_test.values
     test_results["Predicted"] = y_pred
     errors = test_results[test_results["Actual"] != test_results["Predicted"]]
-    logger.info("Количество ошибок на тесте: %d", len(errors))
 
     error_path = ROOT / model_cfg.get("error_analysis_path", "models/error_analysis.csv")
     if len(errors) > 0:
@@ -73,13 +98,20 @@ def main() -> None:
         "model": best_pipeline,
         "feature_names": X_train.columns.tolist(),
         "model_name": best_name,
-        "f1_test": f1_score(y_test, y_pred),
+        "recall_test": recall,
+        "roc_auc_test": roc_auc,
         "errors_sample": errors.head(10) if len(errors) > 0 else None,
     }
     with open(model_path, "wb") as f:
         pickle.dump(model_data, f)
 
     logger.info("Модель и метаданные сохранены в %s", model_path)
+
+    print(
+        f"\nЛучшая модель — {best_name}. "
+        f"Recall на новых данных — {recall:.2f}. "
+        f"Чаще всего она принимает больных за здоровых ({fn} случаев)."
+    )
 
 
 if __name__ == "__main__":

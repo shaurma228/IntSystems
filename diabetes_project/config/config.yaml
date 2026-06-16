@@ -10,7 +10,7 @@ model:
   path: "models/model.pkl"
   error_analysis_path: "models/error_analysis.csv"
   cv: 5
-  scoring: "f1"
+  scoring: "recall"
   random_state: 42
   max_iter: 1000
 

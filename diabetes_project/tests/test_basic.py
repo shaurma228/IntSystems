@@ -1,3 +1,4 @@
+import importlib.util
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +16,43 @@ requires_model = pytest.mark.skipif(
     not MODEL_PATH.exists(), reason="models/model.pkl не найден — запустите train.py"
 )
 
+SAMPLE_PATIENT = [1, 85, 66, 29, 0, 26.6, 0.351, 31]
+
+
+# --- Три обязательных теста по ТЗ (занятие 10) ---
+
+# ТЗ Тест 1: модель и скейлер загружаются, предсказание на конкретном примере не падает
+@requires_model
+def test_tz_predict_no_crash(model_data):
+    model = model_data["model"]
+    features = model_data["feature_names"]
+    X = pd.DataFrame([SAMPLE_PATIENT], columns=features)
+    result = model.predict(X)
+    assert result is not None
+
+
+# ТЗ Тест 2: результат — 0 или 1, сумма вероятностей двух классов равна 1
+@requires_model
+def test_tz_output_format(model_data):
+    model = model_data["model"]
+    features = model_data["feature_names"]
+    X = pd.DataFrame([SAMPLE_PATIENT], columns=features)
+    label = model.predict(X)[0]
+    proba = model.predict_proba(X)[0]
+    assert label in (0, 1)
+    assert abs(proba.sum() - 1.0) < 1e-6
+
+
+# ТЗ Тест 3: app.py импортируется без ошибок
+@requires_model
+def test_tz_app_imports():
+    spec = importlib.util.spec_from_file_location("app", ROOT / "app.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert hasattr(module, "demo")
+
+
+# --- Остальные тесты ---
 
 # 1. Проверка конфигурации
 def test_config_exists():

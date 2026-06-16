@@ -7,6 +7,7 @@ import pandas as pd
 
 ROOT = Path(__file__).parent
 MODEL_PATH = ROOT / "models" / "model.pkl"
+CM_PATH = ROOT / "models" / "confusion_matrix.png"
 
 if not MODEL_PATH.exists():
     raise FileNotFoundError(
@@ -74,7 +75,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         f"""
         # Система диагностики диабета
         Данная система использует машинное обучение для оценки риска наличия диабета.
-        *Версия модели: {model_name} (F1-score на тесте: {model_data.get('f1_test', 0):.2f})*
+        *Версия модели: {model_name} (Recall на тесте: {model_data.get('recall_test', model_data.get('f1_test', 0)):.2f})*
         """
     )
 
@@ -83,14 +84,22 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
             with gr.Row():
                 with gr.Column(scale=1):
                     gr.Markdown("### Введите данные пациента")
-                    pregnancies = gr.Number(label="Беременности", value=1, minimum=0, maximum=20)
-                    glucose = gr.Number(label="Глюкоза (мг/дл)", value=100, minimum=0, maximum=300)
-                    blood_pressure = gr.Number(label="Давление (мм рт.ст.)", value=70, minimum=0, maximum=200)
-                    skin_thickness = gr.Number(label="Толщина кожи (мм)", value=20, minimum=0, maximum=100)
-                    insulin = gr.Number(label="Инсулин (мкЕд/мл)", value=80, minimum=0, maximum=900)
-                    bmi = gr.Number(label="ИМТ (кг/м²)", value=25, minimum=0, maximum=70)
-                    dpf = gr.Number(label="Диабетический фактор", value=0.5, minimum=0, maximum=3)
-                    age = gr.Number(label="Возраст", value=30, minimum=0, maximum=120)
+                    pregnancies = gr.Number(label="Беременности", value=1, minimum=0, maximum=20,
+                                            info="Норма: 0–5")
+                    glucose = gr.Number(label="Глюкоза (мг/дл)", value=100, minimum=0, maximum=300,
+                                        info="Норма натощак: 70–99 мг/дл")
+                    blood_pressure = gr.Number(label="Давление (мм рт.ст.)", value=70, minimum=0, maximum=200,
+                                               info="Норма диастолического: 60–80 мм рт.ст.")
+                    skin_thickness = gr.Number(label="Толщина кожи (мм)", value=20, minimum=0, maximum=100,
+                                               info="Норма трицепса: 10–50 мм")
+                    insulin = gr.Number(label="Инсулин (мкЕд/мл)", value=80, minimum=0, maximum=900,
+                                        info="Норма 2-часового: 16–166 мкЕд/мл")
+                    bmi = gr.Number(label="ИМТ (кг/м²)", value=25, minimum=0, maximum=70,
+                                    info="Норма: 18.5–24.9 кг/м²")
+                    dpf = gr.Number(label="Диабетический фактор", value=0.5, minimum=0, maximum=3,
+                                    info="Генетический риск: чем выше — тем сильнее наследственность (норм. < 0.5)")
+                    age = gr.Number(label="Возраст", value=30, minimum=21, maximum=120,
+                                    info="Датасет включает женщин ≥ 21 года")
 
                     predict_btn = gr.Button("Провести диагностику", variant="primary")
 
@@ -120,11 +129,19 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
             )
 
         with gr.TabItem("Анализ ошибок"):
-            gr.Markdown("### Примеры, на которых модель ошиблась (Top 10)")
-            if errors_sample is not None:
-                gr.DataFrame(errors_sample)
-            else:
-                gr.Markdown("Ошибок на тестовой выборке не обнаружено или данные отсутствуют.")
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### Матрица ошибок (тестовая выборка)")
+                    if CM_PATH.exists():
+                        gr.Image(str(CM_PATH), label="Confusion Matrix", show_label=False)
+                    else:
+                        gr.Markdown("Матрица ошибок не найдена — запустите `train.py`.")
+                with gr.Column():
+                    gr.Markdown("### Примеры, на которых модель ошиблась (Top 10)")
+                    if errors_sample is not None:
+                        gr.DataFrame(errors_sample)
+                    else:
+                        gr.Markdown("Ошибок на тестовой выборке не обнаружено или данные отсутствуют.")
 
 if __name__ == "__main__":
     demo.launch()
